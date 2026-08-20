@@ -1,0 +1,265 @@
+﻿name: Sleep Data Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      object_path:
+        description: "Ruta del CSV dentro de sleep-datasets"
+        required: true
+        type: string
+
+  repository_dispatch:
+    types:
+      - sleep_dataset_uploaded
+
+permissions:
+  contents: read
+
+jobs:
+  sleep-pipeline:
+    name: Process Sleep Cycle dataset
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+      OBJECT_PATH: >-
+        ${{ github.event_name == 'repository_dispatch'
+            && github.event.client_payload.object_path
+            || inputs.object_path }}
+
+    steps:
+      # ======================================================
+      # 1. DESCARGAR CÓDIGO
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ======================================================
+      # 2. PYTHON
+      # ======================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install supabase
+
+      # ======================================================
+      # 3. VALIDAR INPUT
+      # ======================================================
+
+      - name: Validate Storage object path
+        shell: bash
+        run: |
+          echo "Validating Storage object path..."
+
+          if [ -z "$OBJECT_PATH" ]; then
+            echo "ERROR: object_path is empty."
+            exit 1
+          fi
+
+          case "$OBJECT_PATH" in
+            incoming/*.csv)
+              echo "Object path accepted."
+              ;;
+            *)
+              echo "ERROR: Only incoming/*.csv is allowed."
+              exit 1
+              ;;
+          esac
+
+      # ======================================================
+      # 4. DESCARGAR CSV PRIVADO DESDE SUPABASE STORAGE
+      # ======================================================
+
+      - name: Download dataset from Supabase Storage
+        shell: bash
+        run: |
+          mkdir -p data/raw
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from supabase import create_client
+
+          url = os.environ["SUPABASE_URL"]
+          key = os.environ["SUPABASE_SECRET_KEY"]
+          object_path = os.environ["OBJECT_PATH"]
+
+          if not url:
+              raise RuntimeError("SUPABASE_URL is empty.")
+
+          if not key:
+              raise RuntimeError("SUPABASE_SECRET_KEY is empty.")
+
+          print(
+              "Downloading private Storage object: "
+              + object_path
+          )
+
+          supabase = create_client(
+              url,
+              key,
+          )
+
+          data = (
+              supabase.storage
+              .from_("sleep-datasets")
+              .download(object_path)
+          )
+
+          if not data:
+              raise RuntimeError(
+                  "The downloaded dataset is empty."
+              )
+
+          destination = Path(
+              "data/raw/incoming_sleep_cycle.csv"
+          )
+
+          destination.write_bytes(
+              data
+          )
+
+          print(
+              f"Dataset downloaded successfully: "
+              f"{len(data):,} bytes"
+          )
+          PY
+
+      # ======================================================
+      # 5. VALIDACIÓN BÁSICA DEL CSV
+      # ======================================================
+
+      - name: Validate downloaded file
+        shell: bash
+        run: |
+          test -f data/raw/incoming_sleep_cycle.csv
+
+          FILE_SIZE=$(stat -c%s data/raw/incoming_sleep_cycle.csv)
+
+          if [ "$FILE_SIZE" -le 0 ]; then
+            echo "ERROR: Downloaded CSV is empty."
+            exit 1
+          fi
+
+          echo "CSV validation successful."
+          echo "File size: $FILE_SIZE bytes"
+
+      # ======================================================
+      # 6. CREAR .env TEMPORAL
+      # ======================================================
+
+      - name: Create temporary environment file
+        shell: bash
+        env:
+          SLEEP_ENV_FILE: ${{ secrets.SLEEP_ENV_FILE }}
+        run: |
+          if [ -z "$SLEEP_ENV_FILE" ]; then
+            echo "ERROR: SLEEP_ENV_FILE secret is empty."
+            exit 1
+          fi
+
+          printf '%s' "$SLEEP_ENV_FILE" > .env
+
+          chmod 600 .env
+
+          echo ".env created for this runner."
+
+      # ======================================================
+      # 7. EJECUTAR PIPELINE COMPLETO
+      # ======================================================
+
+      - name: Run sleep analytics pipeline
+        shell: bash
+        run: |
+          python src/run_sleep_pipeline.py \
+            --input-file data/raw/incoming_sleep_cycle.csv
+
+      # ======================================================
+      # 8. COMPROBAR RESULTADO
+      # ======================================================
+
+      - name: Validate pipeline result
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary_path = Path(
+              "reports/pipeline/pipeline_run_latest.json"
+          )
+
+          if not summary_path.exists():
+              raise RuntimeError(
+                  "Pipeline summary was not generated."
+              )
+
+          with summary_path.open(
+              "r",
+              encoding="utf-8",
+          ) as file:
+              summary = json.load(file)
+
+          status = summary.get(
+              "status"
+          )
+
+          print(
+              f"Pipeline status: {status}"
+          )
+
+          if status != "success":
+              raise RuntimeError(
+                  "Pipeline did not finish successfully."
+              )
+
+          dataset = summary.get(
+              "dataset",
+              {},
+          )
+
+          print(
+              "Processed dataset: "
+              + str(
+                  dataset.get(
+                      "filename",
+                      "unknown",
+                  )
+              )
+          )
+
+          print(
+              "SHA256: "
+              + str(
+                  dataset.get(
+                      "sha256",
+                      "unknown",
+                  )
+              )
+          )
+          PY
+
+      # ======================================================
+      # 9. LIMPIEZA
+      # ======================================================
+
+      - name: Remove temporary sensitive files
+        if: always()
+        shell: bash
+        run: |
+          rm -f .env
+          rm -f data/raw/incoming_sleep_cycle.csv
+
+          echo "Temporary sensitive files removed."
