@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sleep-data-pipeline
+  cancel-in-progress: false
+
 jobs:
   sleep-pipeline:
     name: Process Sleep Cycle dataset
@@ -25,12 +29,10 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
 
-      OBJECT_PATH: >-
-        ${{ github.event_name == 'repository_dispatch'
-            && github.event.client_payload.object_path
-            || inputs.object_path }}
+      OBJECT_PATH: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.object_path || inputs.object_path }}
 
     steps:
+
       # ======================================================
       # 1. DESCARGAR CÓDIGO
       # ======================================================
@@ -38,8 +40,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       # ======================================================
-      # 2. PYTHON
+      # 2. PREPARAR PYTHON
       # ======================================================
 
       - name: Set up Python
@@ -48,14 +51,20 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+
+      # ======================================================
+      # 3. INSTALAR DEPENDENCIAS
+      # ======================================================
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install supabase
 
+
       # ======================================================
-      # 3. VALIDAR INPUT
+      # 4. VALIDAR RUTA DEL OBJETO
       # ======================================================
 
       - name: Validate Storage object path
@@ -70,7 +79,8 @@ jobs:
 
           case "$OBJECT_PATH" in
             incoming/*.csv)
-              echo "Object path accepted."
+              echo "Object path accepted:"
+              echo "$OBJECT_PATH"
               ;;
             *)
               echo "ERROR: Only incoming/*.csv is allowed."
@@ -78,8 +88,9 @@ jobs:
               ;;
           esac
 
+
       # ======================================================
-      # 4. DESCARGAR CSV PRIVADO DESDE SUPABASE STORAGE
+      # 5. DESCARGAR CSV DESDE SUPABASE STORAGE
       # ======================================================
 
       - name: Download dataset from Supabase Storage
@@ -97,10 +108,14 @@ jobs:
           object_path = os.environ["OBJECT_PATH"]
 
           if not url:
-              raise RuntimeError("SUPABASE_URL is empty.")
+              raise RuntimeError(
+                  "SUPABASE_URL is empty."
+              )
 
           if not key:
-              raise RuntimeError("SUPABASE_SECRET_KEY is empty.")
+              raise RuntimeError(
+                  "SUPABASE_SECRET_KEY is empty."
+              )
 
           print(
               "Downloading private Storage object: "
@@ -137,8 +152,9 @@ jobs:
           )
           PY
 
+
       # ======================================================
-      # 5. VALIDACIÓN BÁSICA DEL CSV
+      # 6. VALIDAR ARCHIVO DESCARGADO
       # ======================================================
 
       - name: Validate downloaded file
@@ -146,7 +162,9 @@ jobs:
         run: |
           test -f data/raw/incoming_sleep_cycle.csv
 
-          FILE_SIZE=$(stat -c%s data/raw/incoming_sleep_cycle.csv)
+          FILE_SIZE=$(
+            stat -c%s data/raw/incoming_sleep_cycle.csv
+          )
 
           if [ "$FILE_SIZE" -le 0 ]; then
             echo "ERROR: Downloaded CSV is empty."
@@ -156,8 +174,9 @@ jobs:
           echo "CSV validation successful."
           echo "File size: $FILE_SIZE bytes"
 
+
       # ======================================================
-      # 6. CREAR .env TEMPORAL
+      # 7. CREAR .env TEMPORAL
       # ======================================================
 
       - name: Create temporary environment file
@@ -176,18 +195,326 @@ jobs:
 
           echo ".env created for this runner."
 
+
       # ======================================================
-      # 7. EJECUTAR PIPELINE COMPLETO
+      # 8. LIMPIEZA PRELIMINAR
+      #
+      # Se ejecuta antes del entrenamiento para conocer:
+      # - primera fecha
+      # - última fecha
+      # - número de sesiones válidas
+      # ======================================================
+
+      - name: Preflight clean incoming dataset
+        shell: bash
+        run: |
+          python src/clean_sleep_data.py \
+            data/raw/incoming_sleep_cycle.csv
+
+
+      # ======================================================
+      # 9. PROTECCIÓN CONTRA DATASETS ANTIGUOS / INCOMPLETOS
+      # ======================================================
+
+      - name: Protect Supabase from stale datasets
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import pandas as pd
+          from pathlib import Path
+          from supabase import create_client
+
+
+          # --------------------------------------------------
+          # Leer dataset entrante ya limpio
+          # --------------------------------------------------
+
+          clean_file = Path(
+              "data/processed/sleep_sessions_clean.csv"
+          )
+
+          if not clean_file.exists():
+              raise RuntimeError(
+                  "Clean dataset was not generated."
+              )
+
+          df = pd.read_csv(
+              clean_file,
+              sep=";",
+              low_memory=False,
+          )
+
+          if "sleep_date" not in df.columns:
+              raise RuntimeError(
+                  "sleep_date column is missing."
+              )
+
+          if "include_in_analytics" not in df.columns:
+              raise RuntimeError(
+                  "include_in_analytics column is missing."
+              )
+
+          df["sleep_date"] = pd.to_datetime(
+              df["sleep_date"],
+              errors="coerce",
+          )
+
+
+          # --------------------------------------------------
+          # Normalizar booleano
+          # --------------------------------------------------
+
+          if pd.api.types.is_bool_dtype(
+              df["include_in_analytics"]
+          ):
+              include_mask = (
+                  df["include_in_analytics"]
+                  .fillna(False)
+              )
+
+          else:
+              include_mask = (
+                  df["include_in_analytics"]
+                  .astype(str)
+                  .str.strip()
+                  .str.lower()
+                  .isin(
+                      [
+                          "true",
+                          "1",
+                          "yes",
+                          "sí",
+                          "si",
+                      ]
+                  )
+              )
+
+
+          analytics = df.loc[
+              include_mask
+              & df["sleep_date"].notna()
+          ].copy()
+
+          if analytics.empty:
+              raise RuntimeError(
+                  "Incoming dataset has no "
+                  "analytical sessions."
+              )
+
+
+          # --------------------------------------------------
+          # Metadata del dataset entrante
+          # --------------------------------------------------
+
+          incoming_first = (
+              analytics["sleep_date"]
+              .min()
+              .date()
+          )
+
+          incoming_last = (
+              analytics["sleep_date"]
+              .max()
+              .date()
+          )
+
+          incoming_sessions = int(
+              len(analytics)
+          )
+
+          print()
+          print(
+              "Incoming dataset:"
+          )
+
+          print(
+              f"  First date: "
+              f"{incoming_first}"
+          )
+
+          print(
+              f"  Last date: "
+              f"{incoming_last}"
+          )
+
+          print(
+              f"  Analytical sessions: "
+              f"{incoming_sessions}"
+          )
+
+
+          # --------------------------------------------------
+          # Leer estado actual de Supabase
+          # --------------------------------------------------
+
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_SECRET_KEY"],
+          )
+
+          response = (
+              supabase
+              .table("dashboard_kpis")
+              .select(
+                  "first_sleep_date,"
+                  "last_sleep_date,"
+                  "analytics_sessions_count"
+              )
+              .limit(1)
+              .execute()
+          )
+
+          rows = response.data or []
+
+
+          # --------------------------------------------------
+          # Si la tabla está vacía, se permite la primera carga
+          # --------------------------------------------------
+
+          if not rows:
+
+              print()
+              print(
+                  "No existing dashboard state found."
+              )
+
+              print(
+                  "Initial database load is allowed."
+              )
+
+              raise SystemExit(0)
+
+
+          current = rows[0]
+
+          current_first = (
+              pd.to_datetime(
+                  current[
+                      "first_sleep_date"
+                  ]
+              )
+              .date()
+          )
+
+          current_last = (
+              pd.to_datetime(
+                  current[
+                      "last_sleep_date"
+                  ]
+              )
+              .date()
+          )
+
+          current_sessions = int(
+              current[
+                  "analytics_sessions_count"
+              ]
+          )
+
+          print()
+          print(
+              "Current Supabase dataset:"
+          )
+
+          print(
+              f"  First date: "
+              f"{current_first}"
+          )
+
+          print(
+              f"  Last date: "
+              f"{current_last}"
+          )
+
+          print(
+              f"  Analytical sessions: "
+              f"{current_sessions}"
+          )
+
+
+          # --------------------------------------------------
+          # REGLA 1
+          # No permitir retroceder la última fecha
+          # --------------------------------------------------
+
+          if incoming_last < current_last:
+
+              raise RuntimeError(
+                  "DATASET BLOCKED: "
+                  "incoming last date "
+                  f"({incoming_last}) is older than "
+                  "the current Supabase last date "
+                  f"({current_last})."
+              )
+
+
+          # --------------------------------------------------
+          # REGLA 2
+          # El export debe conservar el histórico
+          # --------------------------------------------------
+
+          if incoming_first > current_first:
+
+              raise RuntimeError(
+                  "DATASET BLOCKED: "
+                  "incoming dataset starts later "
+                  "than the current dataset. "
+                  "A complete historical export "
+                  "was expected."
+              )
+
+
+          # --------------------------------------------------
+          # REGLA 3
+          # No permitir perder sesiones históricas
+          # --------------------------------------------------
+
+          if incoming_sessions < current_sessions:
+
+              raise RuntimeError(
+                  "DATASET BLOCKED: "
+                  "incoming dataset contains fewer "
+                  "analytical sessions "
+                  f"({incoming_sessions}) than "
+                  "the current Supabase dataset "
+                  f"({current_sessions})."
+              )
+
+
+          print()
+          print("=" * 72)
+
+          print(
+              "DATASET SAFETY CHECK PASSED"
+          )
+
+          print("=" * 72)
+
+          print(
+              "The incoming dataset is safe "
+              "to process."
+          )
+          PY
+
+
+      # ======================================================
+      # 10. EJECUTAR PIPELINE COMPLETO
+      #
+      # --skip-db:
+      # Primero hacemos todos los cálculos sin tocar Supabase.
       # ======================================================
 
       - name: Run sleep analytics pipeline
         shell: bash
         run: |
           python src/run_sleep_pipeline.py \
-            --input-file data/raw/incoming_sleep_cycle.csv
+            --input-file data/raw/incoming_sleep_cycle.csv \
+            --skip-db
+
 
       # ======================================================
-      # 8. COMPROBAR RESULTADO
+      # 11. VALIDAR RESULTADO DEL PIPELINE
       # ======================================================
 
       - name: Validate pipeline result
@@ -210,17 +537,22 @@ jobs:
               "r",
               encoding="utf-8",
           ) as file:
-              summary = json.load(file)
+
+              summary = json.load(
+                  file
+              )
 
           status = summary.get(
               "status"
           )
 
           print(
-              f"Pipeline status: {status}"
+              f"Pipeline status: "
+              f"{status}"
           )
 
           if status != "success":
+
               raise RuntimeError(
                   "Pipeline did not finish successfully."
               )
@@ -251,8 +583,187 @@ jobs:
           )
           PY
 
+
       # ======================================================
-      # 9. LIMPIEZA
+      # 12. CARGAR DASHBOARD A SUPABASE
+      # ======================================================
+
+      - name: Load dashboard to Supabase
+        shell: bash
+        run: |
+          python src/load_dashboard_to_supabase.py \
+            --yes
+
+
+      # ======================================================
+      # 13. CARGAR PREDICCIONES A SUPABASE
+      # ======================================================
+
+      - name: Load forecasts to Supabase
+        shell: bash
+        run: |
+          python src/load_sleep_forecast_to_supabase.py
+
+
+      # ======================================================
+      # 14. VERIFICACIÓN POST-CARGA
+      # ======================================================
+
+      - name: Verify Supabase update
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import pandas as pd
+          from pathlib import Path
+          from supabase import create_client
+
+
+          # --------------------------------------------------
+          # Fecha que debería existir tras la carga
+          # --------------------------------------------------
+
+          kpi_file = Path(
+              "data/dashboard/dashboard_kpis.csv"
+          )
+
+          kpi = pd.read_csv(
+              kpi_file,
+              sep=";",
+          ).iloc[0]
+
+          expected_date = str(
+              pd.to_datetime(
+                  kpi[
+                      "last_sleep_date"
+                  ]
+              )
+              .date()
+          )
+
+
+          # --------------------------------------------------
+          # Cliente Supabase
+          # --------------------------------------------------
+
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_SECRET_KEY"],
+          )
+
+
+          # --------------------------------------------------
+          # Verificar dashboard
+          # --------------------------------------------------
+
+          dashboard_response = (
+              supabase
+              .table("dashboard_kpis")
+              .select(
+                  "last_sleep_date"
+              )
+              .limit(1)
+              .execute()
+          )
+
+          dashboard_rows = (
+              dashboard_response.data
+              or []
+          )
+
+          if not dashboard_rows:
+
+              raise RuntimeError(
+                  "dashboard_kpis is empty "
+                  "after database load."
+              )
+
+          database_date = str(
+              dashboard_rows[0][
+                  "last_sleep_date"
+              ]
+          )
+
+          if database_date != expected_date:
+
+              raise RuntimeError(
+                  "Dashboard verification failed. "
+                  f"Expected {expected_date}, "
+                  f"found {database_date}."
+              )
+
+
+          # --------------------------------------------------
+          # Verificar predicciones
+          # --------------------------------------------------
+
+          forecast_response = (
+              supabase
+              .table("sleep_forecasts")
+              .select(
+                  "as_of_date,"
+                  "horizon_days"
+              )
+              .eq(
+                  "as_of_date",
+                  expected_date,
+              )
+              .execute()
+          )
+
+          forecasts = (
+              forecast_response.data
+              or []
+          )
+
+          horizons = {
+              int(
+                  row[
+                      "horizon_days"
+                  ]
+              )
+              for row in forecasts
+          }
+
+          expected_horizons = {
+              1,
+              7,
+              30,
+          }
+
+          if horizons != expected_horizons:
+
+              raise RuntimeError(
+                  "Forecast verification failed. "
+                  f"Expected horizons "
+                  f"{expected_horizons}, "
+                  f"found {horizons}."
+              )
+
+
+          print()
+          print("=" * 72)
+
+          print(
+              "SUPABASE UPDATE VERIFIED"
+          )
+
+          print("=" * 72)
+
+          print(
+              f"Dashboard latest date: "
+              f"{database_date}"
+          )
+
+          print(
+              "Forecast horizons present: "
+              "1, 7, 30"
+          )
+          PY
+
+
+      # ======================================================
+      # 15. LIMPIEZA FINAL
       # ======================================================
 
       - name: Remove temporary sensitive files
