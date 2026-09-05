@@ -502,7 +502,8 @@ jobs:
       # 10. EJECUTAR PIPELINE COMPLETO
       #
       # --skip-db:
-      # Primero hacemos todos los cálculos sin tocar Supabase.
+      # Primero hacemos todos los cálculos y construimos
+      # la estimación histórica sin tocar Supabase.
       # ======================================================
 
       - name: Run sleep analytics pipeline
@@ -596,13 +597,13 @@ jobs:
 
 
       # ======================================================
-      # 13. CARGAR PREDICCIONES A SUPABASE
+      # 13. CARGAR TIPO DE SUEÑO A SUPABASE
       # ======================================================
 
-      - name: Load forecasts to Supabase
+      - name: Load sleep type prediction to Supabase
         shell: bash
         run: |
-          python src/load_sleep_forecast_to_supabase.py
+          python src/load_sleep_type_prediction_to_supabase.py
 
 
       # ======================================================
@@ -620,19 +621,24 @@ jobs:
 
 
           # --------------------------------------------------
-          # Fecha que debería existir tras la carga
+          # Estado esperado del dashboard
           # --------------------------------------------------
 
           kpi_file = Path(
               "data/dashboard/dashboard_kpis.csv"
           )
 
+          if not kpi_file.exists():
+              raise RuntimeError(
+                  "dashboard_kpis.csv was not generated."
+              )
+
           kpi = pd.read_csv(
               kpi_file,
               sep=";",
           ).iloc[0]
 
-          expected_date = str(
+          expected_dashboard_date = str(
               pd.to_datetime(
                   kpi[
                       "last_sleep_date"
@@ -640,6 +646,72 @@ jobs:
               )
               .date()
           )
+
+
+          # --------------------------------------------------
+          # Predicción histórica esperada
+          # --------------------------------------------------
+
+          prediction_file = Path(
+              "data/prediction/sleep_type_prediction.csv"
+          )
+
+          if not prediction_file.exists():
+              raise RuntimeError(
+                  "sleep_type_prediction.csv was not generated."
+              )
+
+          prediction = pd.read_csv(
+              prediction_file,
+              sep=";",
+          ).iloc[0]
+
+          expected_as_of_date = str(
+              pd.to_datetime(
+                  prediction[
+                      "as_of_date"
+                  ]
+              )
+              .date()
+          )
+
+          expected_target_date = str(
+              pd.to_datetime(
+                  prediction[
+                      "target_date"
+                  ]
+              )
+              .date()
+          )
+
+          expected_sleep_type = str(
+              prediction[
+                  "predicted_sleep_type"
+              ]
+          ).strip()
+
+          expected_probability_pct = float(
+              prediction[
+                  "probability_pct"
+              ]
+          )
+
+          expected_historical_nights = int(
+              prediction[
+                  "historical_nights"
+              ]
+          )
+
+          if (
+              expected_as_of_date
+              != expected_dashboard_date
+          ):
+              raise RuntimeError(
+                  "Prediction as_of_date does not match "
+                  "dashboard last_sleep_date. "
+                  f"Dashboard: {expected_dashboard_date}. "
+                  f"Prediction: {expected_as_of_date}."
+              )
 
 
           # --------------------------------------------------
@@ -684,60 +756,136 @@ jobs:
               ]
           )
 
-          if database_date != expected_date:
+          if (
+              database_date
+              != expected_dashboard_date
+          ):
 
               raise RuntimeError(
                   "Dashboard verification failed. "
-                  f"Expected {expected_date}, "
+                  f"Expected {expected_dashboard_date}, "
                   f"found {database_date}."
               )
 
 
           # --------------------------------------------------
-          # Verificar predicciones
+          # Verificar predicción de tipo de sueño
           # --------------------------------------------------
 
-          forecast_response = (
+          prediction_response = (
               supabase
-              .table("sleep_forecasts")
+              .table(
+                  "sleep_type_predictions"
+              )
               .select(
                   "as_of_date,"
-                  "horizon_days"
+                  "target_date,"
+                  "predicted_sleep_type,"
+                  "probability_pct,"
+                  "prediction_method,"
+                  "historical_nights"
               )
               .eq(
                   "as_of_date",
-                  expected_date,
+                  expected_as_of_date,
               )
+              .limit(1)
               .execute()
           )
 
-          forecasts = (
-              forecast_response.data
+          prediction_rows = (
+              prediction_response.data
               or []
           )
 
-          horizons = {
-              int(
-                  row[
-                      "horizon_days"
-                  ]
-              )
-              for row in forecasts
-          }
-
-          expected_horizons = {
-              1,
-              7,
-              30,
-          }
-
-          if horizons != expected_horizons:
+          if not prediction_rows:
 
               raise RuntimeError(
-                  "Forecast verification failed. "
-                  f"Expected horizons "
-                  f"{expected_horizons}, "
-                  f"found {horizons}."
+                  "Sleep type prediction verification failed. "
+                  f"No row found for {expected_as_of_date}."
+              )
+
+          stored_prediction = (
+              prediction_rows[0]
+          )
+
+          database_target_date = str(
+              stored_prediction[
+                  "target_date"
+              ]
+          )
+
+          database_sleep_type = str(
+              stored_prediction[
+                  "predicted_sleep_type"
+              ]
+          )
+
+          database_probability_pct = float(
+              stored_prediction[
+                  "probability_pct"
+              ]
+          )
+
+          database_method = str(
+              stored_prediction[
+                  "prediction_method"
+              ]
+          )
+
+          database_historical_nights = int(
+              stored_prediction[
+                  "historical_nights"
+              ]
+          )
+
+          if (
+              database_target_date
+              != expected_target_date
+          ):
+              raise RuntimeError(
+                  "Sleep type target_date verification failed. "
+                  f"Expected {expected_target_date}, "
+                  f"found {database_target_date}."
+              )
+
+          if (
+              database_sleep_type
+              != expected_sleep_type
+          ):
+              raise RuntimeError(
+                  "Sleep type verification failed. "
+                  f"Expected {expected_sleep_type}, "
+                  f"found {database_sleep_type}."
+              )
+
+          if abs(
+              database_probability_pct
+              - expected_probability_pct
+          ) > 0.01:
+              raise RuntimeError(
+                  "Sleep type probability verification failed. "
+                  f"Expected {expected_probability_pct:.2f}, "
+                  f"found {database_probability_pct:.2f}."
+              )
+
+          if (
+              database_method
+              != "historical_frequency"
+          ):
+              raise RuntimeError(
+                  "Unexpected prediction method: "
+                  f"{database_method}."
+              )
+
+          if (
+              database_historical_nights
+              != expected_historical_nights
+          ):
+              raise RuntimeError(
+                  "Historical night count verification failed. "
+                  f"Expected {expected_historical_nights}, "
+                  f"found {database_historical_nights}."
               )
 
 
@@ -756,8 +904,18 @@ jobs:
           )
 
           print(
-              "Forecast horizons present: "
-              "1, 7, 30"
+              f"Next night: "
+              f"{database_target_date}"
+          )
+
+          print(
+              f"Sleep type: "
+              f"{database_sleep_type.upper()}"
+          )
+
+          print(
+              f"Historical probability: "
+              f"{database_probability_pct:.2f} %"
           )
           PY
 

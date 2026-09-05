@@ -46,7 +46,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Run the complete sleep analytics "
-            "and prediction pipeline."
+            "and next-night sleep type pipeline."
         )
     )
 
@@ -65,9 +65,9 @@ def parse_args():
         "--skip-db",
         action="store_true",
         help=(
-            "Ejecuta todos los cálculos, análisis, "
-            "entrenamiento y predicciones sin escribir "
-            "nada en Supabase."
+            "Ejecuta todos los cálculos, análisis y la "
+            "estimación histórica sin escribir nada "
+            "en Supabase."
         ),
     )
 
@@ -118,36 +118,15 @@ def build_stages(raw_file):
         },
 
         {
-            "name": "Prepare prediction datasets",
+            "name": "Prepare next-night prediction dataset",
             "script": "prepare_prediction_dataset.py",
             "args": [],
             "db_write": False,
         },
 
         {
-            "name": "Evaluate prediction baselines",
-            "script": "evaluate_prediction_baselines.py",
-            "args": [],
-            "db_write": False,
-        },
-
-        {
-            "name": "Train candidate ML models",
-            "script": "train_prediction_models.py",
-            "args": [],
-            "db_write": False,
-        },
-
-        {
-            "name": "Validate models with purged time split",
-            "script": "validate_prediction_models_purged.py",
-            "args": [],
-            "db_write": False,
-        },
-
-        {
-            "name": "Build production sleep forecast",
-            "script": "build_production_sleep_forecast.py",
+            "name": "Build historical sleep type prediction",
+            "script": "build_sleep_type_prediction.py",
             "args": [],
             "db_write": False,
         },
@@ -162,8 +141,8 @@ def build_stages(raw_file):
         },
 
         {
-            "name": "Load sleep forecast to Supabase",
-            "script": "load_sleep_forecast_to_supabase.py",
+            "name": "Load sleep type prediction to Supabase",
+            "script": "load_sleep_type_prediction_to_supabase.py",
             "args": [],
             "db_write": True,
         },
