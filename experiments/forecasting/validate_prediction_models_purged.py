@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 
 import numpy as np
@@ -23,7 +23,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data" / "prediction"
 REPORT_DIR = PROJECT_ROOT / "reports" / "prediction"
@@ -90,7 +90,7 @@ def load_dataset(horizon):
 
     if not file_path.exists():
         raise FileNotFoundError(
-            f"No se encontró: {file_path}"
+            f"No se encontrÃ³: {file_path}"
         )
 
     df = pd.read_csv(
@@ -139,7 +139,7 @@ def purged_final_split(df):
 
     # IMPORTANTE:
     # eliminamos cualquier fila cuyo resultado
-    # futuro aún no estaría disponible cuando
+    # futuro aÃºn no estarÃ­a disponible cuando
     # comienza el test.
     train = raw_train[
         raw_train["target_date"]
@@ -226,7 +226,7 @@ def create_purged_cv_splits(
     if len(purged_splits) < 2:
         raise ValueError(
             "No hay suficientes folds "
-            "temporales después de aplicar "
+            "temporales despuÃ©s de aplicar "
             "la purga."
         )
 
@@ -441,7 +441,7 @@ def evaluate_horizon(horizon):
     print()
     print("=" * 76)
     print(
-        f"VALIDACIÓN PURGADA — +{horizon} DÍA(S)"
+        f"VALIDACIÃ“N PURGADA â€” +{horizon} DÃA(S)"
     )
     print("=" * 76)
 
@@ -476,7 +476,7 @@ def evaluate_horizon(horizon):
     )
 
     print(
-        "Último target conocido "
+        "Ãšltimo target conocido "
         "en entrenamiento:"
     )
 
@@ -540,7 +540,7 @@ def evaluate_horizon(horizon):
     )
 
     print(
-        f"  Predicción constante: "
+        f"  PredicciÃ³n constante: "
         f"{historical_mean:.3f} h"
     )
 
@@ -704,17 +704,17 @@ def evaluate_horizon(horizon):
         )
 
         print(
-            f"  Dentro ±60 min: "
+            f"  Dentro Â±60 min: "
             f"{result_metrics['within_60_minutes_pct']:.2f}%"
         )
 
         print(
-            f"  R²: "
+            f"  RÂ²: "
             f"{result_metrics['r2']:.4f}"
         )
 
         print(
-            f"  Parámetros: "
+            f"  ParÃ¡metros: "
             f"{search.best_params_}"
         )
 
@@ -746,7 +746,7 @@ def main():
 
     print("=" * 76)
     print(
-        "VALIDACIÓN TEMPORAL PURGADA"
+        "VALIDACIÃ“N TEMPORAL PURGADA"
     )
     print("=" * 76)
 
@@ -822,7 +822,7 @@ def main():
     print()
     print("=" * 76)
     print(
-        "VALIDACIÓN FINALIZADA"
+        "VALIDACIÃ“N FINALIZADA"
     )
     print("=" * 76)
 
@@ -836,8 +836,8 @@ def main():
 
     print()
     print(
-        "Todavía no se ha seleccionado "
-        "ningún modelo de producción."
+        "TodavÃ­a no se ha seleccionado "
+        "ningÃºn modelo de producciÃ³n."
     )
 
 

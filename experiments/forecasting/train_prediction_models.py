@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 
 import joblib
@@ -25,7 +25,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data" / "prediction"
 REPORT_DIR = PROJECT_ROOT / "reports" / "prediction"
@@ -42,7 +42,7 @@ RANDOM_STATE = 42
 
 
 FEATURES = [
-    # Último registro conocido
+    # Ãšltimo registro conocido
     "last_sleep_hours",
     "last_sleep_quality_pct",
     "last_sleep_efficiency_pct",
@@ -53,7 +53,7 @@ FEATURES = [
     # Recencia
     "days_since_last_record",
 
-    # Duración reciente
+    # DuraciÃ³n reciente
     "sleep_mean_3d",
     "sleep_mean_7d",
     "sleep_mean_14d",
@@ -101,7 +101,7 @@ FEATURES = [
 def load_baselines():
     if not BASELINE_FILE.exists():
         raise FileNotFoundError(
-            f"No se encontró: {BASELINE_FILE}"
+            f"No se encontrÃ³: {BASELINE_FILE}"
         )
 
     with open(
@@ -120,7 +120,7 @@ def load_dataset(horizon):
 
     if not file_path.exists():
         raise FileNotFoundError(
-            f"No se encontró: {file_path}"
+            f"No se encontrÃ³: {file_path}"
         )
 
     df = pd.read_csv(
@@ -408,7 +408,7 @@ def evaluate_horizon(
     print()
     print("=" * 76)
     print(
-        f"MODELOS ML — HORIZONTE +{horizon} DÍA(S)"
+        f"MODELOS ML â€” HORIZONTE +{horizon} DÃA(S)"
     )
     print("=" * 76)
 
@@ -444,7 +444,7 @@ def evaluate_horizon(
 
     print(
         f"  {test['origin_date'].min().date()}"
-        f" → "
+        f" â†’ "
         f"{test['origin_date'].max().date()}"
     )
 
@@ -481,7 +481,7 @@ def evaluate_horizon(
     )
 
     # ---------------------------------------------------------
-    # Validación temporal SOLO dentro del entrenamiento
+    # ValidaciÃ³n temporal SOLO dentro del entrenamiento
     # ---------------------------------------------------------
 
     time_cv = TimeSeriesSplit(
@@ -653,17 +653,17 @@ def evaluate_horizon(
         )
 
         print(
-            f"Dentro de ±30 min: "
+            f"Dentro de Â±30 min: "
             f"{metrics['within_30_minutes_pct']:.1f}%"
         )
 
         print(
-            f"Dentro de ±60 min: "
+            f"Dentro de Â±60 min: "
             f"{metrics['within_60_minutes_pct']:.1f}%"
         )
 
         print(
-            f"R²: "
+            f"RÂ²: "
             f"{metrics['r2']:.3f}"
         )
 
@@ -673,7 +673,7 @@ def evaluate_horizon(
         )
 
         print(
-            "Mejores parámetros:"
+            "Mejores parÃ¡metros:"
         )
 
         print(
@@ -681,10 +681,10 @@ def evaluate_horizon(
         )
 
     # ---------------------------------------------------------
-    # Mejor ML según el TEST FINAL
+    # Mejor ML segÃºn el TEST FINAL
     #
-    # Esto es únicamente para evaluación.
-    # Después comprobaremos robustez antes de decidir
+    # Esto es Ãºnicamente para evaluaciÃ³n.
+    # DespuÃ©s comprobaremos robustez antes de decidir
     # el modelo definitivo.
     # ---------------------------------------------------------
 
@@ -868,7 +868,7 @@ def main():
 
     print("=" * 76)
     print(
-        "ENTRENAMIENTO Y EVALUACIÓN DE MODELOS DE SUEÑO"
+        "ENTRENAMIENTO Y EVALUACIÃ“N DE MODELOS DE SUEÃ‘O"
     )
     print("=" * 76)
 
@@ -970,8 +970,8 @@ def main():
     )
 
     print(
-        "No deben usarse todavía para generar "
-        "predicciones en producción."
+        "No deben usarse todavÃ­a para generar "
+        "predicciones en producciÃ³n."
     )
 
 

@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 
 import numpy as np
@@ -10,7 +10,7 @@ from sklearn.metrics import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data" / "prediction"
 REPORT_DIR = PROJECT_ROOT / "reports" / "prediction"
@@ -106,7 +106,7 @@ def load_dataset(horizon):
 
     if not file_path.exists():
         raise FileNotFoundError(
-            f"No se encontró: {file_path}"
+            f"No se encontrÃ³: {file_path}"
         )
 
     df = pd.read_csv(
@@ -167,7 +167,7 @@ def build_baseline_predictions(
 
     # ---------------------------------------------------------
     # Baseline 1:
-    # media histórica del entrenamiento
+    # media histÃ³rica del entrenamiento
     # ---------------------------------------------------------
 
     predictions[
@@ -179,7 +179,7 @@ def build_baseline_predictions(
 
     # ---------------------------------------------------------
     # Baseline 2:
-    # última duración conocida
+    # Ãºltima duraciÃ³n conocida
     # ---------------------------------------------------------
 
     predictions[
@@ -191,7 +191,7 @@ def build_baseline_predictions(
 
     # ---------------------------------------------------------
     # Baseline 3:
-    # media últimos 7 días
+    # media Ãºltimos 7 dÃ­as
     # ---------------------------------------------------------
 
     predictions[
@@ -208,7 +208,7 @@ def build_baseline_predictions(
 
     # ---------------------------------------------------------
     # Baseline 4:
-    # media últimos 30 días
+    # media Ãºltimos 30 dÃ­as
     # ---------------------------------------------------------
 
     predictions[
@@ -222,7 +222,7 @@ def build_baseline_predictions(
 
     # ---------------------------------------------------------
     # Baseline 5:
-    # media histórica según día de semana futuro
+    # media histÃ³rica segÃºn dÃ­a de semana futuro
     #
     # IMPORTANTE:
     # se calcula SOLO usando entrenamiento.
@@ -260,7 +260,7 @@ def evaluate_horizon(horizon):
     print()
     print("=" * 72)
     print(
-        f"HORIZONTE +{horizon} DÍA(S)"
+        f"HORIZONTE +{horizon} DÃA(S)"
     )
     print("=" * 72)
 
@@ -290,7 +290,7 @@ def evaluate_horizon(horizon):
 
     print(
         f"  {train['origin_date'].min().date()}"
-        f" → "
+        f" â†’ "
         f"{train['origin_date'].max().date()}"
     )
 
@@ -300,7 +300,7 @@ def evaluate_horizon(horizon):
 
     print(
         f"  {test['origin_date'].min().date()}"
-        f" → "
+        f" â†’ "
         f"{test['origin_date'].max().date()}"
     )
 
@@ -373,12 +373,12 @@ def evaluate_horizon(horizon):
         )
 
         print(
-            f"  Dentro de ±30 min: "
+            f"  Dentro de Â±30 min: "
             f"{metrics['within_30_minutes_pct']:.1f}%"
         )
 
         print(
-            f"  Dentro de ±60 min: "
+            f"  Dentro de Â±60 min: "
             f"{metrics['within_60_minutes_pct']:.1f}%"
         )
 
@@ -474,7 +474,7 @@ def main():
 
     print("=" * 72)
     print(
-        "EVALUACIÓN DE BASELINES DE PREDICCIÓN"
+        "EVALUACIÃ“N DE BASELINES DE PREDICCIÃ“N"
     )
     print("=" * 72)
 
@@ -572,7 +572,7 @@ def main():
 
     print()
     print(
-        "Evaluación terminada."
+        "EvaluaciÃ³n terminada."
     )
 
 

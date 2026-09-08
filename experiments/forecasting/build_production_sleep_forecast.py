@@ -1,11 +1,11 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 
 import numpy as np
 import pandas as pd
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data" / "prediction"
 REPORT_DIR = PROJECT_ROOT / "reports" / "prediction"
@@ -23,7 +23,7 @@ def load_prediction_dataset(horizon):
 
     if not file_path.exists():
         raise FileNotFoundError(
-            f"No se encontró: {file_path}"
+            f"No se encontrÃ³: {file_path}"
         )
 
     df = pd.read_csv(
@@ -56,7 +56,7 @@ def get_latest_data_date():
 
     if not history_file.exists():
         raise FileNotFoundError(
-            f"No se encontró: {history_file}"
+            f"No se encontrÃ³: {history_file}"
         )
 
     history = pd.read_csv(
@@ -85,7 +85,7 @@ def get_latest_data_date():
 
     if observed.empty:
         raise ValueError(
-            "No existen días observados."
+            "No existen dÃ­as observados."
         )
 
     latest_date = (
@@ -105,13 +105,13 @@ def get_latest_data_date():
 
 def build_walk_forward_errors(df):
     """
-    Simula predicciones históricas reales.
+    Simula predicciones histÃ³ricas reales.
 
     Para cada fecha de origen:
     solamente utiliza resultados cuyo target_date
     era anterior a esa fecha.
 
-    Esto evita utilizar información futura.
+    Esto evita utilizar informaciÃ³n futura.
     """
 
     results = []
@@ -124,8 +124,8 @@ def build_walk_forward_errors(df):
             row["origin_date"]
         )
 
-        # Solo resultados que ya habrían ocurrido
-        # antes de realizar esta predicción.
+        # Solo resultados que ya habrÃ­an ocurrido
+        # antes de realizar esta predicciÃ³n.
         available = df[
             df["target_date"]
             < origin_date
@@ -212,12 +212,12 @@ def build_walk_forward_errors(df):
 
 def calculate_uncertainty(calibration):
     """
-    Calcula intervalos simétricos usando
-    la distribución empírica del error absoluto.
+    Calcula intervalos simÃ©tricos usando
+    la distribuciÃ³n empÃ­rica del error absoluto.
 
     80 %:
         aproximadamente 8 de cada 10 errores
-        históricos quedaron dentro de este rango.
+        histÃ³ricos quedaron dentro de este rango.
 
     90 %:
         aproximadamente 9 de cada 10.
@@ -300,9 +300,9 @@ def build_current_forecast(
     as_of_date,
 ):
 
-    # Normalizamos explícitamente la fecha de origen y convertimos
+    # Normalizamos explÃ­citamente la fecha de origen y convertimos
     # el horizonte a int para evitar operaciones con unidades
-    # timedelta genéricas.
+    # timedelta genÃ©ricas.
     as_of_date = (
         pd.Timestamp(
             as_of_date
@@ -533,7 +533,7 @@ def main():
 
     print("=" * 76)
     print(
-        "PREDICTOR DE PRODUCCIÓN — DURACIÓN DEL SUEÑO"
+        "PREDICTOR DE PRODUCCIÃ“N â€” DURACIÃ“N DEL SUEÃ‘O"
     )
     print("=" * 76)
 
@@ -548,7 +548,7 @@ def main():
 
     print()
     print(
-        "Última fecha con datos:"
+        "Ãšltima fecha con datos:"
     )
 
     print(
@@ -573,7 +573,7 @@ def main():
             (
                 "Los modelos de Machine Learning "
                 "no mostraron una mejora robusta "
-                "frente al baseline en validación "
+                "frente al baseline en validaciÃ³n "
                 "temporal purgada."
             ),
 
@@ -622,7 +622,7 @@ def main():
         print("-" * 76)
 
         print(
-            f"HORIZONTE +{horizon} DÍA(S)"
+            f"HORIZONTE +{horizon} DÃA(S)"
         )
 
         print(
@@ -631,7 +631,7 @@ def main():
         )
 
         print(
-            "Duración estimada:"
+            "DuraciÃ³n estimada:"
         )
 
         print(
@@ -644,7 +644,7 @@ def main():
         )
 
         print(
-            "Rango empírico 80 %:"
+            "Rango empÃ­rico 80 %:"
         )
 
         print(
@@ -654,7 +654,7 @@ def main():
                     "interval_80_low_hours"
                 ]
             )
-            + " — "
+            + " â€” "
             + decimal_hours_to_text(
                 forecast[
                     "interval_80_high_hours"
@@ -663,7 +663,7 @@ def main():
         )
 
         print(
-            "Rango empírico 90 %:"
+            "Rango empÃ­rico 90 %:"
         )
 
         print(
@@ -673,7 +673,7 @@ def main():
                     "interval_90_low_hours"
                 ]
             )
-            + " — "
+            + " â€” "
             + decimal_hours_to_text(
                 forecast[
                     "interval_90_high_hours"
@@ -687,7 +687,7 @@ def main():
         )
 
         print(
-            f"Ejemplos de calibración: "
+            f"Ejemplos de calibraciÃ³n: "
             f"{forecast['calibration_examples']}"
         )
 
@@ -753,13 +753,13 @@ def main():
     )
 
     print(
-        "Estas cifras son estimaciones estadísticas "
-        "personales, no predicciones médicas."
+        "Estas cifras son estimaciones estadÃ­sticas "
+        "personales, no predicciones mÃ©dicas."
     )
 
     print(
         "La incertidumbre debe mostrarse siempre "
-        "junto a la predicción puntual."
+        "junto a la predicciÃ³n puntual."
     )
 
 

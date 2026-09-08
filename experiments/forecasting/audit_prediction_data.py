@@ -1,19 +1,19 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 import pandas as pd
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "sleep_sessions_clean.csv"
 
 
 def main():
     print("=" * 70)
-    print("AUDITORÍA DEL DATASET PARA PREDICCIÓN")
+    print("AUDITORÃA DEL DATASET PARA PREDICCIÃ“N")
     print("=" * 70)
 
     if not INPUT_FILE.exists():
-        raise FileNotFoundError(f"No se encontró el archivo: {INPUT_FILE}")
+        raise FileNotFoundError(f"No se encontrÃ³ el archivo: {INPUT_FILE}")
 
     df = pd.read_csv(INPUT_FILE, sep=";")
 
@@ -75,7 +75,7 @@ def main():
         for col in date_cols:
             print(f"- {col}")
     else:
-        print("No se detectaron automáticamente.")
+        print("No se detectaron automÃ¡ticamente.")
 
     print("\nPOSIBLES VARIABLES OBJETIVO")
     print("-" * 70)
@@ -97,7 +97,7 @@ def main():
         for col in target_cols:
             print(f"- {col}")
     else:
-        print("No se detectaron automáticamente.")
+        print("No se detectaron automÃ¡ticamente.")
 
     print("\nPOSIBLES FLAGS / COLUMNAS DE CONTROL")
     print("-" * 70)
@@ -127,17 +127,17 @@ def main():
             if len(unique_values) <= 20:
                 print(f"    Valores: {unique_values}")
     else:
-        print("No se detectaron automáticamente.")
+        print("No se detectaron automÃ¡ticamente.")
 
     print("\nPRIMERAS 3 FILAS")
     print("-" * 70)
     print(df.head(3).to_string())
 
-    print("\nÚLTIMAS 3 FILAS")
+    print("\nÃšLTIMAS 3 FILAS")
     print("-" * 70)
     print(df.tail(3).to_string())
 
-    print("\nAUDITORÍA FINALIZADA")
+    print("\nAUDITORÃA FINALIZADA")
     print("=" * 70)
 
 

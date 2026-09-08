@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 
 import pandas as pd
@@ -16,7 +16,7 @@ from sqlalchemy.engine import URL
 from sqlalchemy.dialects.postgresql import insert
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 ENV_FILE = PROJECT_ROOT / ".env"
 
@@ -57,7 +57,7 @@ EXPECTED_COLUMNS = [
 def load_environment():
     if not ENV_FILE.exists():
         raise FileNotFoundError(
-            f"No se encontró el archivo .env: {ENV_FILE}"
+            f"No se encontrÃ³ el archivo .env: {ENV_FILE}"
         )
 
     load_dotenv(ENV_FILE)
@@ -114,7 +114,7 @@ def create_database_engine():
 def load_forecast_csv():
     if not INPUT_FILE.exists():
         raise FileNotFoundError(
-            f"No se encontró: {INPUT_FILE}"
+            f"No se encontrÃ³: {INPUT_FILE}"
         )
 
     df = pd.read_csv(
@@ -140,7 +140,7 @@ def load_forecast_csv():
 
     if df.empty:
         raise ValueError(
-            "El archivo de predicciones está vacío."
+            "El archivo de predicciones estÃ¡ vacÃ­o."
         )
 
     # ---------------------------------------------
@@ -276,7 +276,7 @@ def upsert_forecasts(
     # - created_at
     #
     # El resto se actualiza si ya existe
-    # la misma predicción.
+    # la misma predicciÃ³n.
     update_columns = {
         column:
             getattr(
@@ -371,15 +371,15 @@ def main():
 
     print()
     print(
-        "Predicciones que se cargarán:"
+        "Predicciones que se cargarÃ¡n:"
     )
 
     for _, row in forecast_df.iterrows():
         print(
             f"  {row['as_of_date']} "
-            f"→ +{row['horizon_days']} días "
-            f"→ {row['target_date']} "
-            f"→ {float(row['predicted_sleep_hours']):.2f} h"
+            f"â†’ +{row['horizon_days']} dÃ­as "
+            f"â†’ {row['target_date']} "
+            f"â†’ {float(row['predicted_sleep_hours']):.2f} h"
         )
 
     engine = (
@@ -410,12 +410,12 @@ def main():
                 )
             )
 
-        # Una única transacción.
+        # Una Ãºnica transacciÃ³n.
         # Si algo falla, se revierte todo.
         with engine.begin() as connection:
 
             # Advisory lock para evitar dos
-            # loaders simultáneos.
+            # loaders simultÃ¡neos.
             connection.exec_driver_sql(
                 """
                 SELECT pg_advisory_xact_lock(
@@ -443,20 +443,20 @@ def main():
         print()
         print("=" * 72)
         print(
-            "VERIFICACIÓN"
+            "VERIFICACIÃ“N"
         )
         print("=" * 72)
 
         for row in loaded_rows:
             print(
                 f"{row['as_of_date']} "
-                f"| +{row['horizon_days']} días "
+                f"| +{row['horizon_days']} dÃ­as "
                 f"| objetivo {row['target_date']} "
-                f"| predicción "
+                f"| predicciÃ³n "
                 f"{row['predicted_sleep_hours']:.2f} h "
                 f"| 80% "
                 f"{row['interval_80_low_hours']:.2f}"
-                f"–"
+                f"â€“"
                 f"{row['interval_80_high_hours']:.2f} h"
             )
 
@@ -466,7 +466,7 @@ def main():
             forecast_df
         ):
             raise RuntimeError(
-                "La verificación devolvió menos "
+                "La verificaciÃ³n devolviÃ³ menos "
                 "filas de las esperadas."
             )
 
@@ -476,8 +476,8 @@ def main():
         )
 
         print(
-            "No se ha eliminado ningún "
-            "histórico anterior."
+            "No se ha eliminado ningÃºn "
+            "histÃ³rico anterior."
         )
 
     finally:
